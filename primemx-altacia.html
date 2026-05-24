@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>PRIME MX - Sales Tracker - Leon Altacia</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans','Helvetica Neue',sans-serif;background:#f1f5f9;}
+    select,input,button{font-family:inherit;}
+    .day-row{border:1.5px solid #f1f5f9;border-radius:10px;overflow:hidden;margin-bottom:6px;}
+    .day-header{padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;color:#374151;display:flex;justify-content:space-between;align-items:center;background:#fff;}
+    .day-header:hover{background:#f8fafc;}
+    .day-body{padding:12px 14px;background:#fafafa;display:grid;gap:10px;}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    const SB_URL = "https://euhabdfucdnqfuegpbam.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1aGFiZGZ1Y2RucWZ1ZWdwYmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMDQ0NTYsImV4cCI6MjA5NDc4MDQ1Nn0.bOyo1I__thvEzQNGLaV1yhIo5xtABYwC9nR9Bm_PYqQ";
+    const ADMIN_PIN = "admin2025";
+
+    const sb = async (path, opts={}) => {
+      const res = await fetch(SB_URL+"/rest/v1"+path, {
+        ...opts,
+        headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:opts.prefer||"return=representation", ...(opts.headers||{}) }
+      });
+      if(!res.ok){const e=await res.text();throw new Error(e);}
+      const t=await res.text(); return t?JSON.parse(t):null;
+    };
+
+    const T={pospago:7,renovaciones:7,seguros:7,accesorios:2500,meta_ingreso:15000};
+    const DS=["Lun","Mar","Mie","Jue","Vie","Sab","Dom"];
+    const DF=["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"];
+
+    const PN=[
+      {id:"p_azul1",n:"AT&T Azul 1",r:330,c:100},{id:"p_azul2",n:"AT&T Azul 2",r:435,c:180},
+      {id:"p_azul3",n:"AT&T Azul 3",r:550,c:440},{id:"p_plata",n:"AT&T Plata",r:650,c:530},
+      {id:"p_oro",n:"AT&T Oro",r:725,c:590},{id:"p_black",n:"AT&T Black",r:825,c:670},
+      {id:"p_platino",n:"AT&T Platino",r:1035,c:800},{id:"p_diamante",n:"AT&T Diamante",r:1300,c:800},
+      {id:"p_titanio",n:"AT&T Titanio",r:1499,c:670},{id:"p_tit_ti",n:"Titanio Trade In",r:1499,c:335}
+    ];
+    const PP=[
+      {id:"pp_azul1",n:"AT&T Azul 1",r:330,c:90},{id:"pp_azul2",n:"AT&T Azul 2",r:435,c:110},
+      {id:"pp_azul3",n:"AT&T Azul 3",r:550,c:230},{id:"pp_plata",n:"AT&T Plata",r:650,c:265},
+      {id:"pp_oro",n:"AT&T Oro",r:725,c:295},{id:"pp_black",n:"AT&T Black",r:825,c:335},
+      {id:"pp_platino",n:"AT&T Platino",r:1035,c:400},{id:"pp_diamante",n:"AT&T Diamante",r:1300,c:400},
+      {id:"pp_titanio",n:"AT&T Titanio",r:1499,c:335}
+    ];
+    const NN=[
+      {id:"nn_239",n:"Armalo Neg $239",r:239,c:50},{id:"nn_299",n:"Armalo Neg $299",r:299,c:87},
+      {id:"nn_399",n:"Armalo Neg $399",r:399,c:200},{id:"nn_499",n:"Armalo Neg $499",r:499,c:419},
+      {id:"nn_599",n:"Armalo Neg $599",r:599,c:503},{id:"nn_699",n:"Armalo Neg $699",r:699,c:587},
+      {id:"nn_799",n:"Armalo Neg $799",r:799,c:671},{id:"nn_999",n:"Armalo Neg $999",r:999,c:839},
+      {id:"nn_1299",n:"Armalo Neg $1299",r:1299,c:1091},{id:"nn_1499",n:"Armalo Neg $1499",r:1499,c:1259}
+    ];
+    const NP=[
+      {id:"np_239",n:"Armalo Neg $239",r:239,c:25},{id:"np_299",n:"Armalo Neg $299",r:299,c:44},
+      {id:"np_399",n:"Armalo Neg $399",r:399,c:100},{id:"np_499",n:"Armalo Neg $499",r:499,c:210},
+      {id:"np_599",n:"Armalo Neg $599",r:599,c:252},{id:"np_699",n:"Armalo Neg $699",r:699,c:294},
+      {id:"np_799",n:"Armalo Neg $799",r:799,c:336},{id:"np_999",n:"Armalo Neg $999",r:999,c:420},
+      {id:"np_1299",n:"Armalo Neg $1299",r:1299,c:546},{id:"np_1499",n:"Armalo Neg $1499",r:1499,c:630}
+    ];
+    const PL=[
+      {id:"lt_0",n:"AT&T Lite",r:299,c:40},{id:"lt_1",n:"AT&T Lite 1",r:349,c:95},
+      {id:"lt_2",n:"AT&T Lite 2",r:449,c:115},{id:"lt_3",n:"AT&T Lite 3",r:549,c:220},
+      {id:"lt_4",n:"AT&T Lite 4",r:669,c:265},{id:"lt_5",n:"AT&T Lite 5",r:999,c:315}
+    ];
+
+    const ST=[
+      {key:"pos_nuevo",  label:"Pospago Equipo Nuevo",     icon:"📱",tag:"NUEVO", planes:PN,isPOS:true, isRENOV:false},
+      {key:"pos_propio", label:"Pospago Equipo Propio",    icon:"📲",tag:"PROPIO",planes:PP,isPOS:true, isRENOV:false},
+      {key:"renov_nuevo",label:"Renovacion Equipo Nuevo",  icon:"🔄",tag:"NUEVO", planes:PN,isPOS:false,isRENOV:true},
+      {key:"renov_propio",label:"Renovacion Equipo Propio",icon:"🔁",tag:"PROPIO",planes:PP,isPOS:false,isRENOV:true},
+      {key:"neg_nuevo",  label:"Armalo Neg Nuevo",         icon:"🏢",tag:"NUEVO", planes:NN,isPOS:true, isRENOV:false},
+      {key:"neg_propio", label:"Armalo Neg Propio",        icon:"🏛",tag:"PROPIO",planes:NP,isPOS:true, isRENOV:false},
+      {key:"lite",       label:"Plan Lite",                icon:"💡",tag:"LITE",  planes:PL,isPOS:true, isRENOV:false},
+      {key:"accesorio",  label:"Accesorio",                icon:"🛍",tag:null,    planes:null,isPOS:false,isRENOV:false},
+      {key:"seguro",     label:"Seguro / Addon",           icon:"🛡",tag:null,    planes:null,isPOS:false,isRENOV:false},
+      {key:"prepago",    label:"Prepago / Recarga",        icon:"💳",tag:null,    planes:null,isPOS:false,isRENOV:false}
+    ];
+    const TC={NUEVO:{bg:"#dbeafe",color:"#1d4ed8"},PROPIO:{bg:"#fef3c7",color:"#92400e"},LITE:{bg:"#f3e8ff",color:"#6b21a8"}};
+    const PLATA_IDS=["p_plata","p_oro","p_black","p_platino","p_diamante","p_titanio","p_tit_ti"];
+    const AZUL3_IDS=["p_azul3","p_plata","p_oro","p_black","p_platino","p_diamante","p_titanio","p_tit_ti"];
+    const BP=[
+      {ai:1.00,at:1.00,label:"100% indiv + tienda 100%",bono:2100},
+      {ai:1.00,at:0.80,label:"100% indiv + tienda 80%", bono:1500},
+      {ai:0.875,at:0.80,label:"87.5% + tienda 80%",     bono:900},
+      {ai:0,at:0,label:"Menos del 87.5%",               bono:0}
+    ];
+    const BR=[
+      {ai:1.00,at:1.00,label:"100% indiv + tienda 100%",bono:1600},
+      {ai:1.00,at:0.80,label:"100% indiv + tienda 80%", bono:1200},
+      {ai:0.75,at:0.80,label:"75% + tienda 80%",        bono:600},
+      {ai:0,at:0,label:"Menos del 75%",                 bono:0}
+    ];
+    const PAL=[
+      {grad:"linear-gradient(135deg,#0f2942,#1a5276)",acc:"#1a6fa8",soft:"#eaf4fb",brd:"#a8d4f0"},
+      {grad:"linear-gradient(135deg,#0d3b2e,#1a6645)",acc:"#1a7a50",soft:"#e6f7ef",brd:"#90d4b0"},
+      {grad:"linear-gradient(135deg,#3b0d2e,#6a1a55)",acc:"#8a2060",soft:"#f7e6f3",brd:"#d090c0"},
+      {grad:"linear-gradient(135deg,#2e2e0d,#5a5a1a)",acc:"#6e6e10",soft:"#f5f5e6",brd:"#c8c890"},
+      {grad:"linear-gradient(135deg,#0d1f3b,#1a3a6a)",acc:"#1a4080",soft:"#e6ecf7",brd:"#90b0d4"},
+      {grad:"linear-gradient(135deg,#3b1a0d,#6a3510)",acc:"#8a4015",soft:"#f7ede6",brd:"#d4a880"}
+    ];
+
+    const nv=v=>parseFloat(v)||0;
+    const fmtM=v=>v>=1000?"$"+(v/1000).toFixed(1)+"k":"$"+Math.round(v).toLocaleString();
+    const fp=v=>(v*100).toFixed(0)+"%";
+
+    function getST(key){return ST.find(s=>s.key===key);}
+
+    function calcVentaCom(v,puedeC){
+      if(!puedeC) return 0;
+      if(v.tipo==="accesorio") return nv(v.valor)*(v.es_alpha?0.10:0.02);
+      if(v.tipo==="seguro")    return nv(v.valor)*0.80;
+      if(v.tipo==="prepago")   return nv(v.valor)>=150?nv(v.valor)*0.40:0;
+      if(v.plan_com)           return nv(v.plan_com);
+      return 0;
+    }
+
+    function calcStats(ventas,cfg){
+      ventas=ventas||[]; cfg=cfg||{};
+      const ct=nv(cfg.cuota_tienda),vt=nv(cfg.ventas_tienda),mx=nv(cfg.mix_nuevo)/100;
+      const posV   =ventas.filter(v=>getST(v.tipo)&&getST(v.tipo).isPOS).length;
+      const renovV =ventas.filter(v=>getST(v.tipo)&&getST(v.tipo).isRENOV).length;
+      const segV   =ventas.filter(v=>v.tipo==="seguro").length;
+      const accM   =ventas.filter(v=>v.tipo==="accesorio").reduce((s,v)=>s+nv(v.valor),0);
+      const nuevoV =ventas.filter(v=>getST(v.tipo)&&getST(v.tipo).tag==="NUEVO").length;
+      const propioV=ventas.filter(v=>getST(v.tipo)&&getST(v.tipo).tag==="PROPIO").length;
+      const planVentas=ventas.filter(v=>v.plan_renta&&nv(v.plan_renta)>0);
+      const arpu=planVentas.length>0?planVentas.reduce((s,v)=>s+nv(v.plan_renta),0)/planVentas.length:0;
+      const totalEquipo=nuevoV+propioV;
+      const mix=totalEquipo>0?nuevoV/totalEquipo:0;
+      const alcPos=T.pospago>0?posV/T.pospago:0;
+      const alcRenov=T.renovaciones>0?renovV/T.renovaciones:0;
+      const alcSeg=T.seguros>0?segV/T.seguros:0;
+      const alcAcc=T.accesorios>0?accM/T.accesorios:0;
+      const alcT=ct>0?vt/ct:0;
+      const tiendaOK=alcT>=0.80, minPos2=posV>=2, puedeC=tiendaOK&&minPos2;
+      const bpT=BP.find(t=>alcPos>=t.ai&&alcT>=t.at)||BP[3];
+      const brT=BR.find(t=>alcRenov>=t.ai&&alcT>=t.at)||BR[3];
+      const bonoPOS=puedeC?bpT.bono:0, bonoRENOV=puedeC?brT.bono:0;
+      const alcTotOK=(alcPos+alcRenov)/2>=1.0;
+      const lA3=ventas.filter(v=>v.plan_id&&AZUL3_IDS.includes(v.plan_id)&&(v.tipo==="pos_nuevo"||v.tipo==="renov_nuevo")).length;
+      const lPl=ventas.filter(v=>v.plan_id&&PLATA_IDS.includes(v.plan_id)&&(v.tipo==="pos_nuevo"||v.tipo==="renov_nuevo")).length;
+      const iL100=puedeC&&alcTotOK&&mx>=0.55?lA3*100:0;
+      const iLPl=puedeC&&alcTotOK&&mx>=0.60?lPl*200:0;
+      const comV=ventas.reduce((s,v)=>s+calcVentaCom(v,puedeC),0);
+      const acum=comV+bonoPOS+bonoRENOV+iL100+iLPl;
+      return {posV,renovV,segV,accM,nuevoV,propioV,arpu,mix,totalEquipo,alcPos,alcRenov,alcSeg,alcAcc,alcT,tiendaOK,minPos2,puedeC,bonoPOS,bonoRENOV,bpT,brT,iL100,iLPl,comV,acum,perdida:acum-T.meta_ingreso,ct,vt};
+    }
+
+    const S={
+      lbl:{display:"block",fontSize:10,fontWeight:700,color:"#94a3b8",textTransform:"uppercase",marginBottom:4,letterSpacing:"0.07em"},
+      inp:{width:"100%",boxSizing:"border-box",padding:"7px 10px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:13,background:"#fff",outline:"none",color:"#1e293b"},
+      sel:{width:"100%",padding:"7px 10px",border:"1.5px solid #e2e8f0",borderRadius:8,fontSize:13,background:"#fff",outline:"none",color:"#1e293b"}
+    };
+
+    // ── SIMULADOR ──
+    function Simulador({ventas,cfg}){
+      const s=calcStats(ventas,cfg);
+      const ok=s.puedeC, metaOk=s.acum>=T.meta_ingreso;
+      const potencial=ventas.reduce((sum,v)=>sum+calcVentaCom(v,true),0);
+      const ratio=T.meta_ingreso>0?Math.min((ok?s.acum:potencial)/T.meta_ingreso,1):0;
+      const bloques=[
+        {label:"Comisiones por ventas",valor:ok?s.comV:potencial,bloqueado:!ok,req:!ok?(!s.tiendaOK?(s.ct>0?"Tienda al "+fp(s.alcT)+" (necesita 80%)":"Admin no ha fijado la cuota"):"Faltan "+(2-s.posV)+" pospagos individuales"):null},
+        {label:"Bono Pospago",valor:s.bonoPOS,pot:BP[0].bono,bloqueado:!ok||s.bonoPOS===0,req:!ok?"Desbloquea comisiones primero":(s.bonoPOS===0?"Necesitas 100% de pospago":null)},
+        {label:"Bono Renovaciones",valor:s.bonoRENOV,pot:BR[0].bono,bloqueado:!ok||s.bonoRENOV===0,req:!ok?"Desbloquea comisiones primero":(s.bonoRENOV===0?"Necesitas 100% de renovaciones":null)},
+        {label:"Incentivo lineas equipo",valor:s.iL100+s.iLPl,pot:null,bloqueado:!ok||(s.iL100+s.iLPl)===0,req:!ok?"Desbloquea comisiones primero":((s.iL100+s.iLPl)===0?"Mix nuevo 55% y alcance 100%":null)}
+      ];
+      return (
+        <div>
+          <div style={{borderRadius:16,overflow:"hidden",border:"2px solid "+(ok?"#10b981":"#ef4444"),marginBottom:14}}>
+            <div style={{padding:"16px 20px",background:ok?"linear-gradient(135deg,#064e3b,#065f46)":"linear-gradient(135deg,#7f1d1d,#991b1b)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:800,color:"rgba(255,255,255,0.85)",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:3}}>{ok?"✅ COMISIONANDO":"❌ SIN COMISION AUN"}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",lineHeight:1.4}}>
+                    {!ok&&!s.tiendaOK&&s.ct>0&&"Tienda al "+fp(s.alcT)+" (necesita 80%)"}
+                    {!ok&&!s.tiendaOK&&s.ct===0&&"El admin no ha fijado la cuota de tienda"}
+                    {!ok&&s.tiendaOK&&!s.minPos2&&"Llevas "+s.posV+" pospagos (necesitas 2 minimo)"}
+                    {ok&&"Tienda "+fp(s.alcT)+" - "+s.posV+" pospagos individuales"}
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:26,fontWeight:900,color:"#fff",letterSpacing:"-0.03em"}}>{fmtM(ok?s.acum:potencial)}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>{ok?"acumulado real":"potencial bloqueado"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:metaOk?"#6ee7b7":"#fca5a5",marginTop:2}}>
+                    {metaOk?"META LOGRADA +"+fmtM(s.perdida):"Faltan "+fmtM(Math.abs(s.perdida))+" para meta"}
+                  </div>
+                </div>
+              </div>
+              <div style={{marginTop:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,0.6)"}}>Avance vs meta {fmtM(T.meta_ingreso)}</span>
+                  <span style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.9)"}}>{fp(ratio)}</span>
+                </div>
+                <div style={{height:8,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:(ratio*100)+"%",background:metaOk?"#34d399":(ratio>0.6?"#fbbf24":"#f87171"),borderRadius:99,transition:"width 0.5s"}}/>
+                </div>
+              </div>
+            </div>
+            <div style={{background:"#fff"}}>
+              {bloques.map(function(b,i){
+                const verde=!b.bloqueado;
+                return (
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 20px",borderBottom:i<bloques.length-1?"1px solid #f8fafc":"none",background:verde?"#f0fdf4":"#fef2f2"}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:verde?"#10b981":"#ef4444",flexShrink:0}}/>
+                        <span style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{b.label}</span>
+                      </div>
+                      {b.req&&<div style={{fontSize:10,color:"#ef4444",marginTop:2,marginLeft:15}}>{b.req}</div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:17,fontWeight:900,color:verde?"#10b981":"#ef4444"}}>{fmtM(b.valor)}</div>
+                      {b.pot&&b.bloqueado&&<div style={{fontSize:9,color:"#94a3b8"}}>potencial {fmtM(b.pot)}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 20px",background:metaOk?"#f0fdf4":"#fef2f2",borderTop:"2px solid "+(metaOk?"#10b981":"#ef4444")}}>
+                <span style={{fontWeight:800,fontSize:14,color:"#1e293b"}}>Total estimado</span>
+                <span style={{fontWeight:900,fontSize:22,color:metaOk?"#10b981":"#ef4444"}}>{fmtM(ok?s.acum:potencial)}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {BP.filter(t=>t.bono>0).map(function(t,i){
+              const active=s.puedeC&&s.bpT&&s.bpT.label===t.label;
+              return <div key={i} style={{padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(active?"#10b981":"#f1f5f9"),background:active?"#f0fdf4":"#f8fafc"}}><div style={{fontSize:9,color:active?"#065f46":"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Bono POS - {t.label}</div><div style={{fontSize:15,fontWeight:900,color:active?"#10b981":"#cbd5e1"}}>{fmtM(t.bono)}</div>{active&&<div style={{fontSize:9,color:"#10b981",marginTop:2}}>DESBLOQUEADO</div>}</div>;
+            })}
+            {BR.filter(t=>t.bono>0).map(function(t,i){
+              const active=s.puedeC&&s.brT&&s.brT.label===t.label;
+              return <div key={i} style={{padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(active?"#10b981":"#f1f5f9"),background:active?"#f0fdf4":"#f8fafc"}}><div style={{fontSize:9,color:active?"#065f46":"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Bono RENOV - {t.label}</div><div style={{fontSize:15,fontWeight:900,color:active?"#10b981":"#cbd5e1"}}>{fmtM(t.bono)}</div>{active&&<div style={{fontSize:9,color:"#10b981",marginTop:2}}>DESBLOQUEADO</div>}</div>;
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ── NUEVA VENTA ──
+    function NuevaVenta({onAdd,accent}){
+      const [tipo,setTipo]=useState("pos_nuevo");
+      const [planId,setPlanId]=useState("");
+      const [valor,setValor]=useState("");
+      const [alpha,setAlpha]=useState(false);
+      const [dia,setDia]=useState(0);
+      const [loading,setL]=useState(false);
+      const st=getST(tipo);
+      const planObj=st&&st.planes?st.planes.find(p=>p.id===planId):null;
+      const groups=[
+        {label:"Pospago",keys:["pos_nuevo","pos_propio"]},
+        {label:"Renovaciones",keys:["renov_nuevo","renov_propio"]},
+        {label:"Armalo Negocios",keys:["neg_nuevo","neg_propio"]},
+        {label:"Plan Lite",keys:["lite"]},
+        {label:"Adicionales",keys:["accesorio","seguro","prepago"]}
+      ];
+      async function add(){
+        if(st&&st.planes&&!planObj) return;
+        if(st&&!st.planes&&!nv(valor)) return;
+        setL(true);
+        await onAdd({tipo,plan_id:planObj?planObj.id:null,plan_nombre:planObj?planObj.n:null,plan_renta:planObj?planObj.r:null,plan_com:planObj?planObj.c:null,valor:nv(valor),es_alpha:alpha,dia});
+        setPlanId(""); setValor(""); setAlpha(false); setL(false);
+      }
+      const tagC=st&&st.tag?TC[st.tag]:null;
+      return (
+        <div style={{background:"#f8fafc",borderRadius:12,padding:"14px 16px",border:"2px dashed #cbd5e1"}}>
+          <div style={{fontSize:11,fontWeight:800,color:accent,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:10}}>+ Registrar venta</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+            <div><label style={S.lbl}>Dia</label><select value={dia} onChange={e=>setDia(+e.target.value)} style={S.sel}>{DF.map((d,i)=><option key={i} value={i}>{d}</option>)}</select></div>
+            <div><label style={S.lbl}>Tipo</label><select value={tipo} onChange={e=>{setTipo(e.target.value);setPlanId("");}} style={S.sel}>{groups.map(g=><optgroup key={g.label} label={g.label}>{g.keys.map(k=>{const s2=getST(k);return <option key={k} value={k}>{s2.icon} {s2.label}</option>;})}</optgroup>)}</select></div>
+          </div>
+          {tagC&&<div style={{marginBottom:8}}><span style={{fontSize:11,fontWeight:800,padding:"3px 10px",borderRadius:20,background:tagC.bg,color:tagC.color}}>{st.tag==="NUEVO"?"Equipo Nuevo":st.tag==="PROPIO"?"Equipo Propio / BYOD":st.tag}</span></div>}
+          {st&&st.planes&&<div style={{marginBottom:8}}><label style={S.lbl}>Plan</label><select value={planId} onChange={e=>setPlanId(e.target.value)} style={S.sel}><option value="">-- Selecciona plan --</option>{st.planes.map(p=><option key={p.id} value={p.id}>{p.n} - ${p.r} renta - ${p.c} comision</option>)}</select></div>}
+          {st&&!st.planes&&(
+            <div style={{display:"grid",gridTemplateColumns:tipo==="accesorio"?"1fr 1fr":"1fr",gap:8,marginBottom:8}}>
+              <div><label style={S.lbl}>{tipo==="prepago"?"Monto recarga":"Valor"} ($)</label><input type="number" value={valor} onChange={e=>setValor(e.target.value)} placeholder="0" style={S.inp}/></div>
+              {tipo==="accesorio"&&<div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end",paddingBottom:3}}><label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#374151",cursor:"pointer"}}><input type="checkbox" checked={alpha} onChange={e=>setAlpha(e.target.checked)}/> ALPHACOMM (10%)</label><div style={{fontSize:10,color:"#94a3b8"}}>Otras marcas = 2%</div></div>}
+            </div>
+          )}
+          <button onClick={add} disabled={loading} style={{background:accent,color:"#fff",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:700,fontSize:13,cursor:"pointer",width:"100%",opacity:loading?0.7:1}}>{loading?"Guardando...":"Agregar venta"}</button>
+        </div>
+      );
+    }
+
+    // ── PROSPECCIÓN DIARIA (con toggle manual) ──
+    function ProspDia({dia,idx,data,onChange}){
+      const [open,setOpen]=useState(false);
+      const keys=[["prospectos","Prospectos"],["mensajes","Mensajes"],["ventas_act","Ventas Act."],["citas","Citas"],["resenas","Resenas"]];
+      const tots=keys.map(k=>nv(data&&data[k[0]]));
+      const tieneData=tots.some(t=>t>0);
+      return (
+        <div style={{border:"1.5px solid "+(open?"#a8d4f0":"#f1f5f9"),borderRadius:10,overflow:"hidden",marginBottom:6}}>
+          <div onClick={()=>setOpen(!open)} style={{padding:"10px 14px",cursor:"pointer",fontWeight:700,fontSize:13,color:open?"#1a6fa8":"#374151",display:"flex",justifyContent:"space-between",alignItems:"center",background:open?"#eaf4fb":"#fff",userSelect:"none"}}>
+            <span>{dia}</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {tieneData&&<span style={{fontSize:10,color:"#94a3b8"}}>{tots[0]}P / {tots[1]}M / {tots[2]}A / {tots[3]}C / {tots[4]}R</span>}
+              <span style={{color:open?"#1a6fa8":"#94a3b8",fontSize:16}}>{open?"▾":"▸"}</span>
+            </div>
+          </div>
+          {open&&(
+            <div style={{padding:"12px 14px",background:"#fafafa",display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8}}>
+              {keys.map(arr=>(
+                <div key={arr[0]}>
+                  <label style={S.lbl}>{arr[1]}</label>
+                  <input type="number" value={(data&&data[arr[0]])||""} onChange={e=>onChange(arr[0],e.target.value)} placeholder="0" style={S.inp}/>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ── LOGIN ──
+    function Login({onLogin}){
+      const [mode,setMode]=useState("select");
+      const [nombre,setNombre]=useState("");
+      const [pin,setPin]=useState("");
+      const [err,setErr]=useState("");
+      const [loading,setLoading]=useState(false);
+      const [execs,setExecs]=useState([]);
+      useEffect(()=>{sb("/ejecutivos?select=id,nombre&order=nombre").then(setExecs).catch(()=>{});},[]);
+      async function loginExec(){
+        if(!nombre||!pin) return setErr("Selecciona tu nombre e ingresa tu PIN.");
+        setLoading(true); setErr("");
+        try{
+          const res=await sb("/ejecutivos?nombre=eq."+encodeURIComponent(nombre)+"&pin=eq."+pin+"&select=*");
+          if(!res||!res.length){setErr("PIN incorrecto.");setLoading(false);return;}
+          onLogin({type:"exec",exec:res[0]});
+        }catch(e){setErr("Error de conexion.");setLoading(false);}
+      }
+      async function register(){
+        if(!nombre.trim()||pin.length<4) return setErr("Nombre requerido y PIN minimo 4 digitos.");
+        setLoading(true); setErr("");
+        try{
+          const ex=await sb("/ejecutivos?nombre=eq."+encodeURIComponent(nombre.trim())+"&select=id");
+          if(ex&&ex.length){setErr("Ese nombre ya existe.");setLoading(false);return;}
+          const res=await sb("/ejecutivos",{method:"POST",body:JSON.stringify({nombre:nombre.trim(),pin})});
+          onLogin({type:"exec",exec:res[0]});
+        }catch(e){setErr("Error al registrar.");setLoading(false);}
+      }
+      function loginAdmin(){if(pin!==ADMIN_PIN) return setErr("PIN incorrecto."); onLogin({type:"admin"});}
+      const dI=Object.assign({},S.inp,{background:"#0f172a",color:"#e2e8f0",border:"1.5px solid #334155"});
+      const dS=Object.assign({},S.sel,{background:"#0f172a",color:"#e2e8f0",border:"1.5px solid #334155"});
+      return (
+        <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#0f172a 0%,#1a3a5c 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{width:"100%",maxWidth:360}}>
+            <div style={{textAlign:"center",marginBottom:32}}>
+              <div style={{fontSize:11,fontWeight:800,letterSpacing:"0.2em",textTransform:"uppercase",color:"#64748b",marginBottom:6}}>PRIME MX</div>
+              <div style={{fontSize:28,fontWeight:900,color:"#f1f5f9",letterSpacing:"-0.03em"}}>Sales Tracker</div>
+              <div style={{fontSize:13,color:"#64748b",marginTop:4}}>Leon Altacia</div>
+            </div>
+            <div style={{background:"#1e293b",borderRadius:20,padding:"28px 24px",border:"1px solid #334155"}}>
+              {mode==="select"&&<div>
+                <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",textAlign:"center",marginBottom:20}}>Como quieres entrar?</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <button onClick={()=>setMode("exec")} style={{padding:"14px",borderRadius:12,border:"1.5px solid #2d6a9f",background:"rgba(29,106,175,0.15)",color:"#7dd3fc",fontWeight:700,fontSize:14,cursor:"pointer",textAlign:"left"}}>👤 Soy ejecutivo de ventas</button>
+                  <button onClick={()=>setMode("register")} style={{padding:"14px",borderRadius:12,border:"1.5px solid #334155",background:"rgba(51,65,85,0.3)",color:"#94a3b8",fontWeight:700,fontSize:14,cursor:"pointer",textAlign:"left"}}>➕ Registrarme por primera vez</button>
+                  <button onClick={()=>setMode("admin")} style={{padding:"14px",borderRadius:12,border:"1.5px solid rgba(245,158,11,0.3)",background:"rgba(245,158,11,0.08)",color:"#fbbf24",fontWeight:700,fontSize:14,cursor:"pointer",textAlign:"left"}}>🔐 Soy administrador</button>
+                </div>
+              </div>}
+              {mode==="exec"&&<div>
+                <button onClick={()=>{setMode("select");setErr("");}} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:12,marginBottom:16,padding:0}}>← Volver</button>
+                <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:16}}>Selecciona tu nombre</div>
+                <div style={{marginBottom:12}}><label style={Object.assign({},S.lbl,{color:"#64748b"})}>Nombre</label><select value={nombre} onChange={e=>setNombre(e.target.value)} style={dS}><option value="">-- Selecciona --</option>{execs.map(e=><option key={e.id} value={e.nombre}>{e.nombre}</option>)}</select></div>
+                <div style={{marginBottom:16}}><label style={Object.assign({},S.lbl,{color:"#64748b"})}>PIN</label><input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")loginExec();}} placeholder="Tu PIN" style={dI}/></div>
+                {err&&<div style={{fontSize:12,color:"#f87171",marginBottom:10}}>{err}</div>}
+                <button onClick={loginExec} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#0f2942,#1a5276)",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>{loading?"Verificando...":"Entrar →"}</button>
+              </div>}
+              {mode==="register"&&<div>
+                <button onClick={()=>{setMode("select");setErr("");}} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:12,marginBottom:16,padding:0}}>← Volver</button>
+                <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:16}}>Crear tu acceso</div>
+                <div style={{marginBottom:12}}><label style={Object.assign({},S.lbl,{color:"#64748b"})}>Tu nombre completo</label><input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. Ana Garcia" style={dI}/></div>
+                <div style={{marginBottom:16}}><label style={Object.assign({},S.lbl,{color:"#64748b"})}>PIN (minimo 4 digitos)</label><input type="password" value={pin} onChange={e=>setPin(e.target.value)} placeholder="Ej. 1234" style={dI}/></div>
+                {err&&<div style={{fontSize:12,color:"#f87171",marginBottom:10}}>{err}</div>}
+                <button onClick={register} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#0d3b2e,#1a6645)",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>{loading?"Registrando...":"Crear acceso →"}</button>
+              </div>}
+              {mode==="admin"&&<div>
+                <button onClick={()=>{setMode("select");setErr("");}} style={{background:"none",border:"none",color:"#64748b",cursor:"pointer",fontSize:12,marginBottom:16,padding:0}}>← Volver</button>
+                <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginBottom:16}}>Acceso Administrador</div>
+                <div style={{marginBottom:16}}><label style={Object.assign({},S.lbl,{color:"#64748b"})}>PIN Admin</label><input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")loginAdmin();}} placeholder="PIN administrador" style={dI}/></div>
+                {err&&<div style={{fontSize:12,color:"#f87171",marginBottom:10}}>{err}</div>}
+                <button onClick={loginAdmin} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#3b2200,#7a4800)",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer"}}>Entrar como Admin →</button>
+              </div>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── EXEC VIEW ──
+    function ExecView({exec,onLogout}){
+      const [ventas,setVentas]=useState([]);
+      const [cfg,setCfg]=useState({cuota_tienda:"",ventas_tienda:"",mix_nuevo:"65"});
+      const [cfgId,setCfgId]=useState(null);
+      const [ingresoAnt,setIA]=useState(Object.fromEntries(DS.map((_,i)=>[i,""])));
+      const [prosp,setProsp]=useState(Object.fromEntries(DS.map((_,i)=>[i,{prospectos:"",mensajes:"",ventas_act:"",citas:"",resenas:""}])));
+      const [tab,setTab]=useState("sim");
+      const [semLabel,setSemLabel]=useState("Semana actual");
+      const [saving,setSaving]=useState(false);
+      const [loading,setLoading]=useState(true);
+      const cs=PAL[0];
+
+      const load=useCallback(async()=>{
+        setLoading(true);
+        try{
+          const [v,c]=await Promise.all([
+            sb("/ventas?ejecutivo_id=eq."+exec.id+"&order=created_at"),
+            sb("/config_ejecutivo?ejecutivo_id=eq."+exec.id+"&limit=1")
+          ]);
+          setVentas(v||[]);
+          if(c&&c.length){
+            const cx=c[0]; setCfgId(cx.id);
+            setCfg({cuota_tienda:cx.cuota_tienda||"",ventas_tienda:cx.ventas_tienda||"",mix_nuevo:cx.mix_nuevo||"65"});
+            if(cx.ingreso_ant) setIA(cx.ingreso_ant);
+            if(cx.prosp_dias) setProsp(p=>Object.assign({},Object.fromEntries(DS.map((_,i)=>[i,{prospectos:"",mensajes:"",ventas_act:"",citas:"",resenas:""}])),cx.prosp_dias));
+            if(cx.semana_label) setSemLabel(cx.semana_label);
+          }
+        }catch(e){}
+        setLoading(false);
+      },[exec.id]);
+
+      useEffect(()=>{load();},[load]);
+
+      useEffect(()=>{
+        if(loading) return;
+        const t=setTimeout(async()=>{
+          setSaving(true);
+          const payload={ejecutivo_id:exec.id,ventas_tienda:nv(cfg.ventas_tienda),mix_nuevo:nv(cfg.mix_nuevo),ingreso_ant:ingresoAnt,prosp_dias:prosp,semana_label:semLabel,updated_at:new Date().toISOString()};
+          try{
+            if(cfgId){await sb("/config_ejecutivo?id=eq."+cfgId,{method:"PATCH",body:JSON.stringify(payload)});}
+            else{const r=await sb("/config_ejecutivo",{method:"POST",body:JSON.stringify(Object.assign({},payload,{cuota_tienda:0}))});if(r&&r[0])setCfgId(r[0].id);}
+          }catch(e){}
+          setSaving(false);
+        },800);
+        return()=>clearTimeout(t);
+      },[cfg.ventas_tienda,cfg.mix_nuevo,ingresoAnt,prosp,semLabel,loading]);
+
+      async function addVenta(v){
+        const res=await sb("/ventas",{method:"POST",body:JSON.stringify(Object.assign({},v,{ejecutivo_id:exec.id,semana_label:semLabel}))});
+        if(res&&res[0]) setVentas(p=>[...p,res[0]]);
+      }
+      async function removeVenta(id){
+        await sb("/ventas?id=eq."+id,{method:"DELETE",headers:{Prefer:"return=minimal"}});
+        setVentas(p=>p.filter(v=>v.id!==id));
+      }
+
+      const s=calcStats(ventas,cfg);
+      const dias=Object.fromEntries(DS.map((_,i)=>[i,0]));
+      ventas.forEach(v=>{dias[v.dia]=(dias[v.dia]||0)+calcVentaCom(v,s.puedeC);});
+      const totAct=Object.values(dias).reduce((x,v)=>x+v,0);
+      const totAnt=DS.reduce((x,_,i)=>x+nv(ingresoAnt[i]),0);
+      const dIng=totAnt>0?((totAct-totAnt)/totAnt)*100:0;
+      const potencial=ventas.reduce((sum,v)=>sum+calcVentaCom(v,true),0);
+
+      const TABS=[{k:"sim",l:"Simulacion"},{k:"prosp",l:"Prospeccion"},{k:"ventas",l:"Ventas"},{k:"kpis",l:"KPIs"},{k:"ingresos",l:"Ingresos"}];
+
+      if(loading) return <div style={{minHeight:"100vh",background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:"#64748b",fontSize:14}}>Cargando...</div></div>;
+
+      return (
+        <div style={{minHeight:"100vh",background:"#f1f5f9",paddingBottom:60}}>
+          <div style={{background:"#0f172a",padding:"16px 20px",position:"sticky",top:0,zIndex:100,boxShadow:"0 4px 24px rgba(0,0,0,0.25)"}}>
+            <div style={{maxWidth:860,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:"#475569"}}>PRIME MX - SALES TRACKER</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+                  <div style={{fontSize:17,fontWeight:900,color:"#f1f5f9"}}>{exec.nombre}</div>
+                  <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:saving?"rgba(245,158,11,0.2)":"rgba(16,185,129,0.2)",color:saving?"#f59e0b":"#10b981"}}>{saving?"guardando":"guardado"}</span>
+                </div>
+              </div>
+              <button onClick={onLogout} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"#94a3b8",padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}>Salir</button>
+            </div>
+            <div style={{maxWidth:860,margin:"8px auto 0",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+              <input value={semLabel} onChange={e=>setSemLabel(e.target.value)} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:7,color:"#e2e8f0",padding:"5px 10px",fontSize:12,outline:"none",width:170}}/>
+              <div style={{fontSize:11,color:"#64748b"}}>
+                Cuota tienda: <strong style={{color:"#7dd3fc"}}>{cfg.cuota_tienda||"—"}</strong>
+                {cfg.cuota_tienda&&<span style={{marginLeft:6,fontWeight:700,color:s.tiendaOK?"#34d399":"#f87171"}}>{s.tiendaOK?"OK":"Falta"} ({fp(s.alcT)})</span>}
+              </div>
+            </div>
+          </div>
+
+          <div style={{maxWidth:860,margin:"0 auto",padding:"20px 16px 0"}}>
+            <div style={{background:"#fff",borderRadius:20,border:"1.5px solid "+cs.brd,overflow:"hidden",boxShadow:"0 6px 32px "+cs.acc+"18"}}>
+              <div style={{background:cs.grad,padding:"16px 22px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div>
+                    <div style={{fontWeight:900,fontSize:24,color:"#fff",letterSpacing:"-0.03em"}}>{fmtM(s.puedeC?s.acum:potencial)}</div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.6)"}}>{s.puedeC?"ingreso acumulado":"potencial (desbloquealo)"}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontWeight:800,fontSize:13,color:s.perdida>=0?"#34d399":"#f87171"}}>{s.perdida>=0?"+"+fmtM(s.perdida)+" sobre meta":"Faltan "+fmtM(Math.abs(s.perdida))}</div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>meta {fmtM(T.meta_ingreso)}</div>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:10}}>
+                  {[{l:"POS",v:s.posV,t:T.pospago,a:s.alcPos},{l:"RENOV",v:s.renovV,t:T.renovaciones,a:s.alcRenov},{l:"SEG",v:s.segV,t:T.seguros,a:s.alcSeg},{l:"ACC",v:fmtM(s.accM),t:fmtM(T.accesorios),a:s.alcAcc}].map(k=>(
+                    <div key={k.l} style={{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"7px 5px",textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.6)",textTransform:"uppercase"}}>{k.l}</div>
+                      <div style={{fontWeight:900,fontSize:13,color:"#fff",lineHeight:1.1,marginTop:2}}>{k.v}</div>
+                      <div style={{fontSize:9,color:"rgba(255,255,255,0.5)"}}>/{k.t}</div>
+                      <div style={{height:3,background:"rgba(255,255,255,0.18)",borderRadius:99,marginTop:3}}><div style={{height:"100%",width:Math.min(k.a,1)*100+"%",background:k.a>=1?"#34d399":k.a>=0.8?"#fbbf24":"#f87171",borderRadius:99}}/></div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:11,fontWeight:700,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 10px",borderRadius:20}}>ARPU: {s.arpu>0?"$"+Math.round(s.arpu).toLocaleString():"—"}</span>
+                  <span style={{fontSize:11,fontWeight:700,background:"rgba(255,255,255,0.15)",color:"#fff",padding:"2px 10px",borderRadius:20}}>Mix nuevo: {s.totalEquipo>0?fp(s.mix):"—"}</span>
+                  <span style={{fontSize:11,fontWeight:700,padding:"2px 10px",borderRadius:20,background:s.puedeC?"rgba(16,185,129,0.3)":"rgba(239,68,68,0.3)",color:"#fff"}}>{s.puedeC?"Comisionando":"Sin comision"}</span>
+                </div>
+              </div>
+
+              <div style={{display:"flex",borderBottom:"1.5px solid #f1f5f9",background:cs.soft,overflowX:"auto"}}>
+                {TABS.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={{flexShrink:0,padding:"10px 14px",border:"none",cursor:"pointer",background:"transparent",fontWeight:700,fontSize:12,color:tab===t.k?cs.acc:"#94a3b8",borderBottom:tab===t.k?"2.5px solid "+cs.acc:"2.5px solid transparent",marginBottom:-1.5,whiteSpace:"nowrap"}}>{t.l}</button>)}
+              </div>
+
+              <div style={{padding:"20px 22px"}}>
+
+                {tab==="sim"&&(
+                  <div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                      <div><label style={S.lbl}>Ventas tienda esta semana</label><input type="number" value={cfg.ventas_tienda} onChange={e=>setCfg(p=>Object.assign({},p,{ventas_tienda:e.target.value}))} placeholder="ej. 48" style={S.inp}/></div>
+                      <div><label style={S.lbl}>Mix equipo nuevo (%)</label><input type="number" value={cfg.mix_nuevo} onChange={e=>setCfg(p=>Object.assign({},p,{mix_nuevo:e.target.value}))} placeholder="65" style={S.inp}/></div>
+                    </div>
+                    <Simulador ventas={ventas} cfg={cfg}/>
+                  </div>
+                )}
+
+                {tab==="prosp"&&(
+                  <div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:16}}>
+                      {[["prospectos","Prospectos","#1a6fa8"],["mensajes","Mensajes","#1a7a50"],["ventas_act","Ventas Act.","#8a2060"],["citas","Citas","#6e6e10"],["resenas","Resenas","#f97316"]].map(arr=>{
+                        const tot=DS.reduce((s,_,i)=>s+nv(prosp[i]&&prosp[i][arr[0]]),0);
+                        return <div key={arr[0]} style={{background:"#f8fafc",borderRadius:10,padding:"10px 6px",border:"1px solid #f1f5f9",textAlign:"center"}}><div style={{fontWeight:900,fontSize:18,color:arr[2]}}>{tot}</div><div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>{arr[1]}</div></div>;
+                      })}
+                    </div>
+                    {DS.map((_,i)=>(
+                      <ProspDia key={i} dia={DF[i]} idx={i} data={prosp[i]} onChange={(k,v)=>{setProsp(p=>{const np=Object.assign({},p);np[i]=Object.assign({},np[i]);np[i][k]=v;return np;});}}/>
+                    ))}
+                  </div>
+                )}
+
+                {tab==="ventas"&&(
+                  <div>
+                    {ventas.length>0&&(
+                      <div style={{marginBottom:16}}>
+                        {DS.map((_,di)=>{
+                          const vd=ventas.filter(v=>v.dia===di);
+                          if(!vd.length) return null;
+                          return (
+                            <div key={di} style={{marginBottom:10}}>
+                              <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:5}}>{DF[di]}</div>
+                              {vd.map(v=>{
+                                const st2=getST(v.tipo);
+                                const potCom=calcVentaCom(v,true);
+                                const tagC2=st2&&st2.tag?TC[st2.tag]:null;
+                                return (
+                                  <div key={v.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:"#f8fafc",borderRadius:9,marginBottom:4,border:"1px solid "+(s.puedeC?"#f1f5f9":"#fecaca")}}>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                                        <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>{st2&&st2.icon} {v.plan_nombre||(st2&&st2.label)||""}{!v.plan_nombre&&v.valor?" $"+nv(v.valor).toLocaleString():""}</span>
+                                        {tagC2&&<span style={{fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:20,background:tagC2.bg,color:tagC2.color}}>{st2.tag}</span>}
+                                      </div>
+                                      {v.plan_renta&&<div style={{fontSize:10,color:"#94a3b8"}}>${v.plan_renta} renta</div>}
+                                      <div style={{fontSize:11,fontWeight:800,marginTop:2,color:s.puedeC?"#10b981":"#ef4444"}}>
+                                        {s.puedeC?fmtM(potCom):<span>{fmtM(potCom)} <span style={{fontSize:9,fontWeight:800,background:"#fee2e2",color:"#991b1b",padding:"1px 5px",borderRadius:10,marginLeft:3}}>BLOQUEADO</span></span>}
+                                      </div>
+                                    </div>
+                                    <button onClick={()=>removeVenta(v.id)} style={{background:"none",border:"none",color:"#cbd5e1",cursor:"pointer",fontSize:16,padding:"0 4px",flexShrink:0}}>✕</button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                        <div style={{borderRadius:12,overflow:"hidden",border:"2px solid "+(s.puedeC?"#10b981":"#ef4444"),marginTop:8,marginBottom:14}}>
+                          <div style={{padding:"10px 16px",background:s.puedeC?"#065f46":"#991b1b",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div>
+                              <div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,0.8)",textTransform:"uppercase",letterSpacing:"0.08em"}}>{s.puedeC?"COMISIONANDO":"SIN COMISION AUN"}</div>
+                              <div style={{fontSize:10,color:"rgba(255,255,255,0.65)",marginTop:1}}>
+                                {!s.puedeC&&!s.tiendaOK&&s.ct>0&&"Tienda al "+fp(s.alcT)+" (necesita 80%)"}
+                                {!s.puedeC&&!s.tiendaOK&&s.ct===0&&"El admin no ha fijado la cuota"}
+                                {!s.puedeC&&s.tiendaOK&&!s.minPos2&&"Faltan "+(2-s.posV)+" pospagos individuales"}
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontSize:22,fontWeight:900,color:"#fff"}}>{fmtM(s.puedeC?s.acum:potencial)}</div>
+                              <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>{s.puedeC?"acumulado real":"potencial (bloqueado)"}</div>
+                            </div>
+                          </div>
+                          {!s.puedeC&&<div style={{padding:"8px 16px",background:"#fff7f7",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:11,color:"#64748b"}}>Se desbloqueara al cumplir los requisitos</span><span style={{fontSize:13,fontWeight:800,color:"#ef4444"}}>{fmtM(potencial)}</span></div>}
+                          {s.puedeC&&(s.bonoPOS+s.bonoRENOV)>0&&<div style={{padding:"8px 16px",background:"#f0fdf4",display:"flex",justifyContent:"space-between"}}><span style={{fontSize:11,color:"#065f46",fontWeight:600}}>+ Bonos desbloqueados</span><span style={{fontSize:13,fontWeight:800,color:"#10b981"}}>{fmtM(s.bonoPOS+s.bonoRENOV)}</span></div>}
+                        </div>
+                      </div>
+                    )}
+                    <NuevaVenta onAdd={addVenta} accent={cs.acc}/>
+                  </div>
+                )}
+
+                {tab==="kpis"&&(
+                  <div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                      <div style={{background:"#f0f9ff",borderRadius:12,padding:"14px",border:"1px solid #bae6fd",textAlign:"center"}}>
+                        <div style={{fontSize:10,color:"#0369a1",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>ARPU Semanal</div>
+                        <div style={{fontSize:22,fontWeight:900,color:"#0369a1"}}>{s.arpu>0?"$"+Math.round(s.arpu).toLocaleString():"—"}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>ticket promedio de planes</div>
+                      </div>
+                      <div style={{background:"#f0fdf4",borderRadius:12,padding:"14px",border:"1px solid #a7f3d0",textAlign:"center"}}>
+                        <div style={{fontSize:10,color:"#065f46",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>Mix Equipo Nuevo</div>
+                        <div style={{fontSize:22,fontWeight:900,color:s.mix>=0.55?"#10b981":"#f59e0b"}}>{s.totalEquipo>0?fp(s.mix):"—"}</div>
+                        <div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{s.nuevoV} nuevo / {s.propioV} propio</div>
+                      </div>
+                    </div>
+                    {[{l:"Pospagos",v:s.posV,t:T.pospago,bono:s.bonoPOS,tier:s.bpT&&s.bpT.label},{l:"Renovaciones",v:s.renovV,t:T.renovaciones,bono:s.bonoRENOV,tier:s.brT&&s.brT.label},{l:"Seguros",v:s.segV,t:T.seguros},{l:"Accesorios",v:s.accM,t:T.accesorios,unit:"$"}].map(k=>{
+                      const ratio=k.t>0?k.v/k.t:0, color=ratio>=1?"#10b981":ratio>=0.8?"#f59e0b":"#ef4444";
+                      return (
+                        <div key={k.l} style={{marginBottom:14}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                            <span style={{fontSize:11,fontWeight:700,color:"#475569"}}>{k.l}</span>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              {k.bono!==undefined&&<span style={{fontSize:10,fontWeight:800,padding:"1px 7px",borderRadius:20,background:ratio>=1?"#d1fae5":"#fef3c7",color:ratio>=1?"#065f46":"#92400e"}}>{ratio>=1?"Bono "+fmtM(k.bono):"Falta "+(k.t-k.v)}</span>}
+                              <span style={{fontSize:12,fontWeight:800,color}}>{k.unit==="$"?fmtM(k.v):k.v}/{k.unit==="$"?fmtM(k.t):k.t} - {fp(Math.min(ratio,9.99))}</span>
+                            </div>
+                          </div>
+                          <div style={{height:7,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:Math.min(ratio,1)*100+"%",background:color,borderRadius:99,transition:"width 0.4s"}}/></div>
+                          {k.tier&&<div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>{k.tier}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {tab==="ingresos"&&(
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 16px",background:cs.soft,borderRadius:12,border:"1.5px solid "+cs.brd,marginBottom:16}}>
+                      <div>
+                        <div style={{fontSize:11,color:"#94a3b8",marginBottom:2}}>Ingresos semana actual</div>
+                        <div style={{fontSize:26,fontWeight:900,color:cs.acc,letterSpacing:"-0.03em"}}>{fmtM(totAct)}</div>
+                        <div style={{fontSize:11,color:"#94a3b8"}}>vs {fmtM(totAnt)} sem. ant.</div>
+                      </div>
+                      {(totAct>0||totAnt>0)&&<span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:20,background:dIng>=0?"#d1fae5":"#fee2e2",color:dIng>=0?"#065f46":"#991b1b"}}>{dIng>=0?"▲":"▼"}{Math.abs(dIng).toFixed(1)}%</span>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:6,marginBottom:6}}>{["Dia","Ant $","Actual $","Delta"].map(h=><span key={h} style={Object.assign({},S.lbl,{margin:0})}>{h}</span>)}</div>
+                    {DS.map((_,i)=>{
+                      const c=dias[i]||0, p=nv(ingresoAnt[i]), d=p>0?((c-p)/p)*100:0;
+                      return (
+                        <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:6,alignItems:"center",marginBottom:6}}>
+                          <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>{DF[i]}</span>
+                          <input type="number" value={ingresoAnt[i]||""} onChange={e=>{setIA(p2=>{const n2=Object.assign({},p2);n2[i]=e.target.value;return n2;});}} placeholder="0" style={Object.assign({},S.inp,{textAlign:"right",padding:"6px 8px",fontSize:12})}/>
+                          <div style={{textAlign:"right",fontWeight:700,fontSize:13,color:c>0?cs.acc:"#94a3b8"}}>${Math.round(c).toLocaleString()}</div>
+                          <div style={{textAlign:"right"}}>{(c>0||p>0)?<span style={{fontSize:10,fontWeight:800,padding:"1px 5px",borderRadius:20,background:d>=0?"#d1fae5":"#fee2e2",color:d>=0?"#065f46":"#991b1b"}}>{d>=0?"▲":"▼"}{Math.abs(d).toFixed(0)}%</span>:<span style={{fontSize:10,color:"#e2e8f0"}}>--</span>}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── ADMIN VIEW ──
+    function AdminView({onLogout}){
+      const [rows,setRows]=useState([]);
+      const [loading,setLoading]=useState(true);
+      const [lastRef,setLastRef]=useState(null);
+      const [aTab,setATab]=useState("ranking");
+      const [cuota,setCuota]=useState("");
+      const [savingC,setSavingC]=useState(false);
+
+      const load=useCallback(async()=>{
+        try{
+          const [execs,ventas,cfgs]=await Promise.all([
+            sb("/ejecutivos?select=*&order=nombre"),
+            sb("/ventas?select=*&order=created_at"),
+            sb("/config_ejecutivo?select=*")
+          ]);
+          const built=(execs||[]).map((exec,idx)=>{
+            const ev=(ventas||[]).filter(v=>v.ejecutivo_id===exec.id);
+            const cfg=(cfgs||[]).find(c=>c.ejecutivo_id===exec.id)||{};
+            return {exec,ev,cfg,s:calcStats(ev,cfg),cs:PAL[idx%PAL.length]};
+          });
+          built.sort((a,b)=>b.s.acum-a.s.acum);
+          setRows(built);
+          if(built.length>0&&built[0].cfg.cuota_tienda) setCuota(String(built[0].cfg.cuota_tienda));
+          setLastRef(new Date().toLocaleTimeString("es-MX"));
+        }catch(e){}
+        setLoading(false);
+      },[]);
+
+      useEffect(()=>{load();const iv=setInterval(load,30000);return()=>clearInterval(iv);},[load]);
+
+      async function saveCuota(){
+        if(!cuota) return; setSavingC(true);
+        try{
+          const cfgs=await sb("/config_ejecutivo?select=id,ejecutivo_id");
+          for(let i=0;i<rows.length;i++){
+            const row=rows[i];
+            const ex=(cfgs||[]).find(c=>c.ejecutivo_id===row.exec.id);
+            if(ex){await sb("/config_ejecutivo?id=eq."+ex.id,{method:"PATCH",body:JSON.stringify({cuota_tienda:nv(cuota)})});}
+            else{await sb("/config_ejecutivo",{method:"POST",body:JSON.stringify({ejecutivo_id:row.exec.id,cuota_tienda:nv(cuota),mix_nuevo:65})});}
+          }
+          await load();
+        }catch(e){}
+        setSavingC(false);
+      }
+
+      const totAcum=rows.reduce((x,r)=>x+r.s.acum,0);
+      const totMeta=rows.length*T.meta_ingreso;
+      const totBonos=rows.reduce((x,r)=>x+r.s.bonoPOS+r.s.bonoRENOV,0);
+      const ATABS=[{k:"ranking",l:"Ranking"},{k:"simulacion",l:"Simulaciones"},{k:"arpu_mix",l:"ARPU y Mix"},{k:"mensual",l:"Avance Mensual"},{k:"prospeccion",l:"Prospeccion"},{k:"cuota",l:"Cuota"}];
+
+      if(loading) return <div style={{minHeight:"100vh",background:"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{color:"#64748b"}}>Cargando...</div></div>;
+
+      return (
+        <div style={{minHeight:"100vh",background:"#f1f5f9",paddingBottom:60}}>
+          <div style={{background:"#0f172a",padding:"16px 20px",position:"sticky",top:0,zIndex:100,boxShadow:"0 4px 24px rgba(0,0,0,0.25)"}}>
+            <div style={{maxWidth:920,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.18em",textTransform:"uppercase",color:"#475569"}}>PRIME MX - Admin</div>
+                <div style={{fontSize:17,fontWeight:900,color:"#f1f5f9"}}>Dashboard Leon Altacia</div>
+                {lastRef&&<div style={{fontSize:10,color:"#475569",marginTop:1}}>Actualizado {lastRef} · auto 30s</div>}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={load} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"#94a3b8",padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}>🔄 Refresh</button>
+                <button onClick={onLogout} style={{background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"#94a3b8",padding:"7px 14px",fontWeight:700,fontSize:12,cursor:"pointer"}}>Salir</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{maxWidth:920,margin:"0 auto",padding:"20px 16px 0"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18}}>
+              {[["Acumulado equipo",fmtM(totAcum),"#1a6fa8"],["Meta total",fmtM(totMeta),totAcum>=totMeta?"#10b981":"#ef4444"],["Bonos desbloqueados",fmtM(totBonos),"#10b981"],["POS total",String(rows.reduce((x,r)=>x+r.s.posV,0)),"#f97316"]].map(arr=>(
+                <div key={arr[0]} style={{background:"#fff",borderRadius:14,padding:"14px",border:"1.5px solid #f1f5f9",boxShadow:"0 2px 12px rgba(0,0,0,0.04)"}}>
+                  <div style={{fontWeight:900,fontSize:20,color:arr[2]}}>{arr[1]}</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>{arr[0]}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{background:"#fff",borderRadius:16,border:"1.5px solid #e2e8f0",overflow:"hidden",boxShadow:"0 2px 16px rgba(0,0,0,0.05)"}}>
+              <div style={{display:"flex",borderBottom:"1.5px solid #f1f5f9",background:"#f8fafc",overflowX:"auto"}}>
+                {ATABS.map(t=><button key={t.k} onClick={()=>setATab(t.k)} style={{flexShrink:0,padding:"11px 14px",border:"none",cursor:"pointer",background:"transparent",fontWeight:700,fontSize:12,color:aTab===t.k?"#1a6fa8":"#94a3b8",borderBottom:aTab===t.k?"2.5px solid #1a6fa8":"2.5px solid transparent",marginBottom:-1.5,whiteSpace:"nowrap"}}>{t.l}</button>)}
+              </div>
+
+              <div style={{padding:"20px"}}>
+
+                {aTab==="ranking"&&(
+                  <div>
+                    <div style={{height:8,background:"#f1f5f9",borderRadius:99,overflow:"hidden",marginBottom:16}}><div style={{height:"100%",width:Math.min(totMeta>0?totAcum/totMeta:0,1)*100+"%",background:totAcum>=totMeta?"#10b981":"linear-gradient(90deg,#f59e0b,#f97316)",borderRadius:99}}/></div>
+                    {rows.map((row,rank)=>{
+                      const {exec,s,cs}=row; const perdida=s.acum-T.meta_ingreso;
+                      return (
+                        <div key={exec.id} style={{padding:"14px",borderBottom:"1px solid #f8fafc",marginBottom:4}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:28,height:28,borderRadius:"50%",background:rank===0?"#f59e0b":rank===1?"#9ca3af":rank===2?"#d97706":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:rank<3?"#fff":"#9ca3af",flexShrink:0}}>{rank+1}</div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontWeight:700,fontSize:14,color:"#1e293b"}}>{exec.nombre}</div>
+                              <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>POS:{s.posV} RENOV:{s.renovV} SEG:{s.segV} ACC:{fmtM(s.accM)} | ARPU:{s.arpu>0?"$"+Math.round(s.arpu).toLocaleString():"—"} Mix:{s.totalEquipo>0?fp(s.mix):"—"}</div>
+                              <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>
+                                {s.puedeC&&<span style={{fontSize:10,fontWeight:800,background:"#d1fae5",color:"#065f46",padding:"1px 7px",borderRadius:20}}>Comisionando</span>}
+                                {!s.puedeC&&<span style={{fontSize:10,fontWeight:800,background:"#fee2e2",color:"#991b1b",padding:"1px 7px",borderRadius:20}}>{!s.tiendaOK?"Cuota "+fp(s.alcT):"Falta min POS"}</span>}
+                                {s.bonoPOS>0&&<span style={{fontSize:10,fontWeight:800,background:"#d1fae5",color:"#065f46",padding:"1px 7px",borderRadius:20}}>Bono POS {fmtM(s.bonoPOS)}</span>}
+                                {s.bonoRENOV>0&&<span style={{fontSize:10,fontWeight:800,background:"#d1fae5",color:"#065f46",padding:"1px 7px",borderRadius:20}}>Bono RENOV {fmtM(s.bonoRENOV)}</span>}
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0}}>
+                              <div style={{fontWeight:900,fontSize:18,color:cs.acc}}>{fmtM(s.acum)}</div>
+                              <div style={{fontSize:12,fontWeight:800,color:perdida>=0?"#10b981":"#ef4444"}}>{perdida>=0?"+"+fmtM(perdida):"-"+fmtM(Math.abs(perdida))}</div>
+                            </div>
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginTop:10}}>
+                            {[{l:"POS",v:s.posV,t:T.pospago,d:false},{l:"RENOV",v:s.renovV,t:T.renovaciones,d:false},{l:"SEG",v:s.segV,t:T.seguros,d:false},{l:"ACC",v:s.accM,t:T.accesorios,d:true}].map(k=>{
+                              const r=k.t>0?k.v/k.t:0;
+                              return <div key={k.l}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{fontSize:9,color:"#94a3b8",fontWeight:700}}>{k.l}</span><span style={{fontSize:9,color:r>=1?"#10b981":r>=0.8?"#f59e0b":"#ef4444",fontWeight:800}}>{k.d?fmtM(k.v):k.v}/{k.d?fmtM(k.t):k.t}</span></div><div style={{height:4,background:"#f1f5f9",borderRadius:99,overflow:"hidden"}}><div style={{height:"100%",width:Math.min(r,1)*100+"%",background:r>=1?"#10b981":r>=0.8?"#f59e0b":"#ef4444",borderRadius:99}}/></div></div>;
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {aTab==="simulacion"&&(
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#374151",marginBottom:16}}>Simulacion de ingreso — todos los ejecutivos</div>
+                    {rows.map(row=>(
+                      <div key={row.exec.id} style={{marginBottom:22}}>
+                        <div style={{fontSize:13,fontWeight:800,color:row.cs.acc,marginBottom:8,padding:"8px 12px",background:row.cs.soft,borderRadius:8,border:"1px solid "+row.cs.brd,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span>{row.exec.nombre}</span>
+                          <span style={{fontSize:11,color:"#64748b"}}>Cuota tienda: {row.cfg.cuota_tienda||"sin fijar"} | ARPU: {row.s.arpu>0?"$"+Math.round(row.s.arpu).toLocaleString():"—"} | Mix: {row.s.totalEquipo>0?fp(row.s.mix):"—"}</span>
+                        </div>
+                        <Simulador ventas={row.ev} cfg={row.cfg}/>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {aTab==="arpu_mix"&&(
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#374151",marginBottom:16}}>ARPU y Mix por ejecutivo</div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                        <thead>
+                          <tr style={{background:"#f8fafc"}}>
+                            {["Ejecutivo","Ventas c/plan","ARPU","Nuevo","Propio","Mix Nuevo","Estado"].map(h=>(
+                              <th key={h} style={{padding:"10px 12px",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row,ri)=>{
+                            const {exec,s,cs}=row;
+                            const mc=s.mix>=0.55?"#10b981":s.mix>=0.40?"#f59e0b":"#ef4444";
+                            return (
+                              <tr key={exec.id} style={{background:ri%2===0?"#fff":"#f8fafc"}}>
+                                <td style={{padding:"10px 12px",fontWeight:700,color:cs.acc}}>{exec.nombre}</td>
+                                <td style={{padding:"10px 12px",textAlign:"center"}}>{s.totalEquipo}</td>
+                                <td style={{padding:"10px 12px",fontWeight:800,color:"#0369a1"}}>{s.arpu>0?"$"+Math.round(s.arpu).toLocaleString():"—"}</td>
+                                <td style={{padding:"10px 12px",fontWeight:700,color:"#1d4ed8",textAlign:"center"}}>{s.nuevoV}</td>
+                                <td style={{padding:"10px 12px",fontWeight:700,color:"#92400e",textAlign:"center"}}>{s.propioV}</td>
+                                <td style={{padding:"10px 12px"}}><span style={{fontWeight:800,color:mc}}>{s.totalEquipo>0?fp(s.mix):"—"}</span><div style={{height:4,background:"#f1f5f9",borderRadius:99,marginTop:3,width:60}}><div style={{height:"100%",width:Math.min(s.mix,1)*100+"%",background:mc,borderRadius:99}}/></div></td>
+                                <td style={{padding:"10px 12px"}}><span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:20,background:s.puedeC?"#d1fae5":"#fee2e2",color:s.puedeC?"#065f46":"#991b1b"}}>{s.puedeC?"Si":"No"}</span></td>
+                              </tr>
+                            );
+                          })}
+                          <tr style={{background:"#eaf4fb"}}>
+                            <td style={{padding:"10px 12px",fontWeight:800,color:"#1a6fa8"}}>PROMEDIO</td>
+                            <td style={{padding:"10px 12px",textAlign:"center",fontWeight:800,color:"#1a6fa8"}}>{rows.reduce((s,r)=>s+r.s.totalEquipo,0)}</td>
+                            <td style={{padding:"10px 12px",fontWeight:800,color:"#0369a1"}}>{(()=>{const rs=rows.filter(r=>r.s.arpu>0);return rs.length>0?"$"+Math.round(rs.reduce((s,r)=>s+r.s.arpu,0)/rs.length).toLocaleString():"—";})()}</td>
+                            <td style={{padding:"10px 12px",textAlign:"center",fontWeight:800,color:"#1d4ed8"}}>{rows.reduce((s,r)=>s+r.s.nuevoV,0)}</td>
+                            <td style={{padding:"10px 12px",textAlign:"center",fontWeight:800,color:"#92400e"}}>{rows.reduce((s,r)=>s+r.s.propioV,0)}</td>
+                            <td style={{padding:"10px 12px"}}>{(()=>{const tot=rows.reduce((s,r)=>s+r.s.totalEquipo,0);const nv2=rows.reduce((s,r)=>s+r.s.nuevoV,0);return tot>0?<span style={{fontWeight:800,color:"#1a6fa8"}}>{fp(nv2/tot)}</span>:"—";})()}</td>
+                            <td style={{padding:"10px 12px"}}><span style={{fontSize:11,fontWeight:800,color:"#1a6fa8"}}>{rows.filter(r=>r.s.puedeC).length}/{rows.length} comisionando</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {aTab==="mensual"&&(
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#374151",marginBottom:4}}>Avance mensual acumulado</div>
+                    <div style={{fontSize:11,color:"#94a3b8",marginBottom:16}}>Se actualiza automaticamente conforme los ejecutivos registran ventas.</div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                        <thead>
+                          <tr style={{background:"#f8fafc"}}>
+                            {["Ejecutivo","POS","RENOV","SEG","ACC $","Comisiones","Bonos","Total","ARPU","Mix Nuevo"].map(h=>(
+                              <th key={h} style={{padding:"10px 10px",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row,ri)=>{
+                            const {exec,s,cs}=row;
+                            return (
+                              <tr key={exec.id} style={{background:ri%2===0?"#fff":"#f8fafc"}}>
+                                <td style={{padding:"10px 10px",fontWeight:700,color:cs.acc,whiteSpace:"nowrap"}}>{exec.nombre}</td>
+                                <td style={{padding:"10px 10px",textAlign:"center"}}><span style={{fontWeight:700,color:s.alcPos>=1?"#10b981":"#374151"}}>{s.posV}</span></td>
+                                <td style={{padding:"10px 10px",textAlign:"center"}}><span style={{fontWeight:700,color:s.alcRenov>=1?"#10b981":"#374151"}}>{s.renovV}</span></td>
+                                <td style={{padding:"10px 10px",textAlign:"center"}}><span style={{fontWeight:700,color:s.alcSeg>=1?"#10b981":"#374151"}}>{s.segV}</span></td>
+                                <td style={{padding:"10px 10px"}}><span style={{fontWeight:700,color:s.alcAcc>=1?"#10b981":"#374151"}}>{fmtM(s.accM)}</span></td>
+                                <td style={{padding:"10px 10px",fontWeight:700}}>{fmtM(s.comV)}</td>
+                                <td style={{padding:"10px 10px",fontWeight:700,color:"#10b981"}}>{fmtM(s.bonoPOS+s.bonoRENOV)}</td>
+                                <td style={{padding:"10px 10px",fontWeight:900,color:cs.acc,fontSize:13}}>{fmtM(s.acum)}</td>
+                                <td style={{padding:"10px 10px",fontWeight:700,color:"#0369a1"}}>{s.arpu>0?"$"+Math.round(s.arpu).toLocaleString():"—"}</td>
+                                <td style={{padding:"10px 10px"}}><span style={{fontWeight:800,color:s.mix>=0.55?"#10b981":s.mix>=0.40?"#f59e0b":"#ef4444"}}>{s.totalEquipo>0?fp(s.mix):"—"}</span></td>
+                              </tr>
+                            );
+                          })}
+                          <tr style={{background:"#eaf4fb"}}>
+                            <td style={{padding:"10px 10px",fontWeight:800,color:"#1a6fa8"}}>TOTAL</td>
+                            <td style={{padding:"10px 10px",textAlign:"center",fontWeight:800,color:"#1a6fa8"}}>{rows.reduce((x,r)=>x+r.s.posV,0)}</td>
+                            <td style={{padding:"10px 10px",textAlign:"center",fontWeight:800,color:"#1a6fa8"}}>{rows.reduce((x,r)=>x+r.s.renovV,0)}</td>
+                            <td style={{padding:"10px 10px",textAlign:"center",fontWeight:800,color:"#1a6fa8"}}>{rows.reduce((x,r)=>x+r.s.segV,0)}</td>
+                            <td style={{padding:"10px 10px",fontWeight:800,color:"#1a6fa8"}}>{fmtM(rows.reduce((x,r)=>x+r.s.accM,0))}</td>
+                            <td style={{padding:"10px 10px",fontWeight:800,color:"#1a6fa8"}}>{fmtM(rows.reduce((x,r)=>x+r.s.comV,0))}</td>
+                            <td style={{padding:"10px 10px",fontWeight:800,color:"#10b981"}}>{fmtM(rows.reduce((x,r)=>x+r.s.bonoPOS+r.s.bonoRENOV,0))}</td>
+                            <td style={{padding:"10px 10px",fontWeight:900,color:"#1a6fa8",fontSize:14}}>{fmtM(rows.reduce((x,r)=>x+r.s.acum,0))}</td>
+                            <td style={{padding:"10px 10px",fontWeight:800,color:"#0369a1"}}>{(()=>{const rs=rows.filter(r=>r.s.arpu>0);return rs.length>0?"$"+Math.round(rs.reduce((s,r)=>s+r.s.arpu,0)/rs.length).toLocaleString():"—";})()}</td>
+                            <td style={{padding:"10px 10px"}}>{(()=>{const tot=rows.reduce((x,r)=>x+r.s.totalEquipo,0);const nv2=rows.reduce((x,r)=>x+r.s.nuevoV,0);return tot>0?<span style={{fontWeight:800,color:"#1a6fa8"}}>{fp(nv2/tot)}</span>:"—";})()}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {aTab==="prospeccion"&&(
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#374151",marginBottom:16}}>Concentrado de prospeccion diaria</div>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                        <thead>
+                          <tr style={{background:"#f8fafc"}}>
+                            <th style={{padding:"8px 12px",textAlign:"left",fontWeight:700,color:"#64748b",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #e2e8f0"}}>Ejecutivo</th>
+                            {DS.map(d=><th key={d} colSpan={5} style={{padding:"8px 4px",textAlign:"center",fontWeight:700,color:"#64748b",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #e2e8f0",borderLeft:"1px solid #e2e8f0"}}>{d}</th>)}
+                            <th colSpan={5} style={{padding:"8px 4px",textAlign:"center",fontWeight:800,color:"#1a6fa8",fontSize:10,textTransform:"uppercase",borderBottom:"2px solid #e2e8f0",borderLeft:"2px solid #a8d4f0"}}>TOTAL</th>
+                          </tr>
+                          <tr style={{background:"#f8fafc"}}>
+                            <th style={{padding:"4px 12px",borderBottom:"1px solid #e2e8f0"}}></th>
+                            {DS.map(d=>["P","M","A","C","R"].map(l=><th key={d+l} style={{padding:"4px 2px",textAlign:"center",fontWeight:700,color:"#94a3b8",fontSize:8,borderBottom:"1px solid #e2e8f0",borderLeft:l==="P"?"1px solid #e2e8f0":"none"}}>{l}</th>))}
+                            {["P","M","A","C","R"].map(l=><th key={"t"+l} style={{padding:"4px 2px",textAlign:"center",fontWeight:700,color:"#1a6fa8",fontSize:8,borderBottom:"1px solid #e2e8f0",borderLeft:l==="P"?"2px solid #a8d4f0":"none"}}>{l}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row,ri)=>{
+                            const {exec,cfg,cs}=row;
+                            const pd=cfg.prosp_dias||{};
+                            const keys=["prospectos","mensajes","ventas_act","citas","resenas"];
+                            const tots=keys.map(k=>DS.reduce((s,_,i)=>s+nv(pd[i]&&pd[i][k]),0));
+                            return (
+                              <tr key={exec.id} style={{background:ri%2===0?"#fff":"#f8fafc"}}>
+                                <td style={{padding:"8px 12px",fontWeight:700,color:cs.acc,fontSize:12,whiteSpace:"nowrap"}}>{exec.nombre}</td>
+                                {DS.map((_,i)=>keys.map((k,ki)=>{
+                                  const val=nv(pd[i]&&pd[i][k]);
+                                  return <td key={i+k} style={{padding:"6px 2px",textAlign:"center",borderLeft:ki===0?"1px solid #f1f5f9":"none",fontSize:11,fontWeight:val>0?700:400,color:val>0?"#1e293b":"#cbd5e1"}}>{val||"—"}</td>;
+                                }))}
+                                {tots.map((t,ti)=><td key={"tot"+ti} style={{padding:"6px 3px",textAlign:"center",fontWeight:800,color:"#1a6fa8",borderLeft:ti===0?"2px solid #e2e8f0":"none"}}>{t}</td>)}
+                              </tr>
+                            );
+                          })}
+                          <tr style={{background:"#eaf4fb"}}>
+                            <td style={{padding:"8px 12px",fontWeight:800,color:"#1a6fa8",fontSize:12}}>EQUIPO</td>
+                            {DS.map((_,i)=>["prospectos","mensajes","ventas_act","citas","resenas"].map((k,ki)=>{
+                              const tot=rows.reduce((s,r)=>s+nv((r.cfg.prosp_dias||{})[i]&&(r.cfg.prosp_dias||{})[i][k]),0);
+                              return <td key={i+k} style={{padding:"6px 2px",textAlign:"center",fontWeight:800,color:"#1a6fa8",borderLeft:ki===0?"1px solid #a8d4f0":"none",fontSize:11}}>{tot||"—"}</td>;
+                            }))}
+                            {["prospectos","mensajes","ventas_act","citas","resenas"].map((k,ki)=>{
+                              const tot=rows.reduce((s,r)=>s+DS.reduce((ss,_,i)=>ss+nv((r.cfg.prosp_dias||{})[i]&&(r.cfg.prosp_dias||{})[i][k]),0),0);
+                              return <td key={"gt"+k} style={{padding:"6px 3px",textAlign:"center",fontWeight:900,color:"#1a6fa8",fontSize:12,borderLeft:ki===0?"2px solid #a8d4f0":"none"}}>{tot}</td>;
+                            })}
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div style={{marginTop:8,fontSize:10,color:"#94a3b8"}}>P=Prospectos | M=Mensajes | A=Ventas Activadas | C=Citas | R=Resenas</div>
+                    </div>
+                  </div>
+                )}
+
+                {aTab==="cuota"&&(
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#374151",marginBottom:6}}>Cuota semanal de tienda</div>
+                    <div style={{fontSize:12,color:"#64748b",marginBottom:16,lineHeight:1.6}}>Fija cuantos pospagos debe vender la tienda. Se aplica a todos los ejecutivos. Solo el admin puede modificarla.</div>
+                    <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:24}}>
+                      <div style={{flex:1}}><label style={S.lbl}>Cuota de tienda (pospagos)</label><input type="number" value={cuota} onChange={e=>setCuota(e.target.value)} placeholder="ej. 56" style={Object.assign({},S.inp,{fontSize:20,fontWeight:800,padding:"12px 14px"})}/></div>
+                      <button onClick={saveCuota} disabled={savingC} style={{padding:"12px 24px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#0f2942,#1a5276)",color:"#fff",fontWeight:800,fontSize:14,cursor:"pointer",opacity:savingC?0.7:1,whiteSpace:"nowrap"}}>{savingC?"Guardando...":"Aplicar a todos"}</button>
+                    </div>
+                    <div style={{background:"#f8fafc",borderRadius:12,border:"1px solid #e2e8f0",overflow:"hidden"}}>
+                      <div style={{padding:"12px 16px",borderBottom:"1px solid #e2e8f0",fontSize:11,fontWeight:800,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.08em"}}>Estado por ejecutivo</div>
+                      {rows.map(row=>(
+                        <div key={row.exec.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid #f8fafc"}}>
+                          <span style={{fontWeight:700,fontSize:13,color:row.cs.acc}}>{row.exec.nombre}</span>
+                          <div style={{display:"flex",alignItems:"center",gap:16}}>
+                            <span style={{fontSize:12,color:"#64748b"}}>Cuota: <strong style={{color:"#1e293b"}}>{row.cfg.cuota_tienda||"—"}</strong></span>
+                            <span style={{fontSize:12,color:"#64748b"}}>Ventas: <strong style={{color:"#1e293b"}}>{row.cfg.ventas_tienda||0}</strong></span>
+                            <span style={{fontSize:12,fontWeight:800,color:row.s.tiendaOK?"#10b981":"#ef4444"}}>{row.cfg.cuota_tienda?fp(row.s.alcT):"—"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App(){
+      const [session,setSession]=useState(null);
+      if(!session) return React.createElement(Login,{onLogin:setSession});
+      if(session.type==="admin") return React.createElement(AdminView,{onLogout:()=>setSession(null)});
+      return React.createElement(ExecView,{exec:session.exec,onLogout:()=>setSession(null)});
+    }
+
+    const root=ReactDOM.createRoot(document.getElementById("root"));
+    root.render(React.createElement(App,null));
+  </script>
+</body>
+</html>
